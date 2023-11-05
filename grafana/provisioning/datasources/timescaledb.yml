@@ -1,0 +1,19 @@
+# Configuration file version
+apiVersion: 1
+
+datasources:
+
+  - name: TimescaleDB
+    type: postgres
+    url: timescaledb:5432
+    database: gosp3
+    user: postgres
+    secureJsonData:
+      password: 'changeme'
+    jsonData:
+      sslmode: 'disable'
+      maxOpenConns: 0
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      postgresVersion: 1400
+      timescaledb: false

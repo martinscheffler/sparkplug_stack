@@ -1,0 +1,33 @@
+CALL insert_sparkplug_payload(
+        '{{.GroupId}}',
+        '{{.MessageType}}',
+        '{{.EdgeNodeId}}',
+        {{with .DeviceId}}'{{.}}'{{else}}null{{end}},
+        {{with .Payload.Timestamp}}to_timestamp({{.}} / 1000) AT TIME ZONE 'UTC'{{else}}null{{end}},
+        {{with .Payload.Seq}}{{.}}{{else}}null{{end}},
+        {{with .Payload.Uuid}}'{{.}}'{{else}}null{{end}},
+        null,
+        {{with .Payload.Metrics}}
+            ARRAY[{{ range $i, $e := . }}{{if $i}},{{end}}
+                ROW(
+                    {{with $e.Name}}'{{.}}'{{else}}null{{end}},
+                    {{with $e.Alias}}{{.}}{{else}}null{{end}},
+                    {{with $e.Timestamp}}to_timestamp({{.}} / 1000) AT TIME ZONE 'UTC'{{else}}null{{end}},
+                    {{with $e.Datatype}}{{.}}{{else}}null{{end}},
+                    {{with $e.IsHistorical}}{{.}}{{else}}null{{end}},
+                    {{with $e.IsTransient}}{{.}}{{else}}null{{end}},
+                    {{with $e.IsNull}}{{.}}{{else}}null{{end}},
+                    {{with $e.Metadata}}{{.}}{{else}}null{{end}},
+                    {{with $e.Properties}}{{.}}{{else}}null{{end}},
+                    {{with $e.GetStringValue}}'{{.}}'{{else}}null{{end}},
+                    {{with $e.GetBooleanValue}}{{.}}{{else}}null{{end}},
+                    {{with $e.GetIntValue}}{{.}}{{else}}null{{end}},
+                    {{with $e.GetLongValue}}{{.}}{{else}}null{{end}},
+                    {{with $e.GetDoubleValue}}{{.}}{{else}}null{{end}},
+                    {{with $e.GetFloatValue}}{{.}}{{else}}null{{end}}
+                )::metric_type
+            {{ end }}
+            ]
+        {{else}}null{{end}}
+    )
+

@@ -1,0 +1,49 @@
+version: "3.9"
+services:
+    
+  timescaledb:
+    container_name: timescaledb
+    build:
+      context: timescaledb/
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: gosp3
+
+  nats:
+    container_name: nats
+    image: nats:2.10.1-alpine3.18
+    ports:
+      - "1883:1883" # MQTT port
+      - "4222:4222" # NATS port
+    command: -c /nats.conf
+    volumes:
+      - ./nats/nats.conf:/nats.conf:ro
+
+  spb_to_timescaledb:
+    container_name: spb_to_timescaledb
+    build:
+      context: spb_to_timescaledb/
+    restart: unless-stopped
+    environment:
+      NATS_BROKER: "nats://nats:4222"
+      POSTGRES_URL: "postgres://postgres:changeme@timescaledb:5432/gosp3"
+
+  grafana:
+    container_name: grafana
+    build:
+      context: grafana/
+    restart: unless-stopped
+    ports:
+      - 3000:3000
+    volumes:
+      #- ./grafana/data:/var/lib/grafana # data path
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      #GF_INSTALL_PLUGINS: briangann-gauge-panel
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
