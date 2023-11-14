@@ -8,5 +8,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o spb_to_timescaled
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 WORKDIR /root/
+COPY insert_spb.sql.gohtml .
 COPY --from=builder /app/spb_to_timescaledb .
 CMD ["./spb_to_timescaledb"]

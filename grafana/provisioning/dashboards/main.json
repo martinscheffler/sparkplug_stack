@@ -126,11 +126,11 @@
             "type": "postgres",
             "uid": "P40AE60E18F02DE32"
           },
-          "editorMode": "builder",
+          "editorMode": "code",
           "format": "table",
           "hide": false,
           "rawQuery": true,
-          "rawSql": "SELECT value AS \"Temperature\", sent AS \"time\" FROM telemetry WHERE (metric_name = 'temp' AND edge_node_name = '${edge_node_name:raw}' AND device_name = '${device_ams4516:raw}') ORDER BY sent DESC LIMIT 200 ",
+          "rawSql": "SELECT * from fetch_double_metrics_by_name('spie',\r\n                                          'DDATA',\r\n                                          'edge0001',\r\n                                          'sin2',\r\n                                          'value'\r\n                                              '', 2000000);",
           "refId": "A",
           "sql": {
             "columns": [
@@ -570,7 +570,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "select (metric).value_double as value, data.timestamp as time from data, UNNEST(metrics) as metric\r\nWHERE (edge_node_id = '${edge_node_name:raw}' AND device_id = '${device_sim_sin:raw}')\r\nORDER BY time DESC LIMIT 2000\r\n",
+          "rawSql": "SELECT * from fetch_double_metrics_by_name('spie',\r\n                                          'DDATA',\r\n                                          'edge0001',\r\n                                          'sin3',\r\n                                          'value'\r\n                                              '', 2000000);",
           "refId": "A",
           "sql": {
             "columns": [

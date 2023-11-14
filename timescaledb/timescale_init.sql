@@ -170,4 +170,62 @@ BEGIN
         );
     END IF;
 END;
+$$;
+
+
+CREATE OR REPLACE FUNCTION fetch_float_metrics_by_name(p_group_id TEXT,
+                                                       p_message_type message_type,
+                                                       p_edge_node_id TEXT,
+                                                       p_device_id TEXT,
+                                                       p_metric_name TEXT,
+                                                       p_limit INT
+)
+    RETURNS TABLE (
+                      "time" TIMESTAMPTZ,
+                      "value" REAL) AS
 $$
+BEGIN
+RETURN QUERY
+SELECT
+    m.timestamp as "time",
+    m.value_float as "value"
+FROM data as d
+         CROSS JOIN LATERAL unnest(d.metrics) AS m
+WHERE d.group_id=p_group_id
+  AND d.message_type=p_message_type
+  AND d.edge_node_id=p_edge_node_id
+  AND d.device_id=p_device_id
+  AND m.name=p_metric_name
+  ORDER BY m.timestamp DESC LIMIT p_limit;
+END;
+$$
+LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION fetch_double_metrics_by_name(p_group_id TEXT,
+                                                       p_message_type message_type,
+                                                       p_edge_node_id TEXT,
+                                                       p_device_id TEXT,
+                                                       p_metric_name TEXT,
+                                                       p_limit INT
+)
+    RETURNS TABLE (
+                      "time" TIMESTAMPTZ,
+                      "value" DOUBLE PRECISION) AS
+$$
+BEGIN
+RETURN QUERY
+SELECT
+    m.timestamp as "time",
+    m.value_double as "value"
+FROM data as d
+         CROSS JOIN LATERAL unnest(d.metrics) AS m
+WHERE d.group_id=p_group_id
+  AND d.message_type=p_message_type
+  AND d.edge_node_id=p_edge_node_id
+  AND d.device_id=p_device_id
+  AND m.name=p_metric_name
+ORDER BY m.timestamp DESC LIMIT p_limit;
+END;
+$$
+LANGUAGE plpgsql;
