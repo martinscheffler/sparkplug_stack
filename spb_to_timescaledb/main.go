@@ -160,6 +160,7 @@ func loadTemplateFromFile() {
 }
 
 func connectDB() {
+	fmt.Printf("Connecting to PostgreSQL on URL %v.\n", PostgresURL)
 	pgConfig, err := pgx.ParseConfig(PostgresURL)
 	if err != nil {
 		log.Fatal("error parsing postgres config: ", err)
@@ -177,8 +178,10 @@ func disconnectDB() {
 }
 
 func connectNats() {
+
+	fmt.Printf("Connecting to NATS on URL %v.\n", NatsBroker)
 	// connect to NATS
-	nc, err := nats.Connect(nats.DefaultURL)
+	nc, err := nats.Connect(NatsBroker)
 	if err != nil {
 		log.Fatal(err)
 	}

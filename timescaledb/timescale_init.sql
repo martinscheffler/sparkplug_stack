@@ -3,14 +3,10 @@ CREATE EXTENSION IF NOT EXISTS timescaledb;
 
 
 CREATE TYPE message_type AS ENUM (
-    'NBIRTH',
-    'NDEATH',
-    'DBIRTH',
-    'DDEATH',
-    'NDATA',
-    'DDATA',
-    'NCMD',
-    'DCMD',
+    'BIRTH',
+    'DEATH',
+    'DATA',
+    'CMD',
     'STATE'
     );
 
@@ -68,27 +64,22 @@ create table public.data
 
 SELECT create_hypertable('data', 'received_at');
 
-create table public.birth_data
+
+create table public.last_birth_msg
 (
     group_id TEXT NOT NULL,
     edge_node_id TEXT NOT NULL,
     device_id TEXT NULL,
     timestamp TIMESTAMPTZ NULL,
     metrics metric_type[],
-    seq BIGINT NULL,
-    prop_hardware_make TEXT,
-    prop_hardware_model TEXT,
-    prop_fw TEXT,
-    prop_os TEXT,
-    prop_os_version TEXT,
-    received_at TIMESTAMPTZ NOT NULL,
-    death_received_AT TIMESTAMPTZ,
-    CONSTRAINT constraint_name UNIQUE (group_id, edge_node_id, device_id)
+    received_at TIMESTAMPTZ NOT NULL
 );
+
+
 
 CREATE OR REPLACE PROCEDURE insert_sparkplug_payload(
     p_group_id TEXT,
-    p_message_type message_type,
+    p_message_type TEXT,
     p_edge_node_id TEXT,
     p_device_id TEXT,
     p_timestamp TIMESTAMPTZ,
@@ -98,121 +89,58 @@ CREATE OR REPLACE PROCEDURE insert_sparkplug_payload(
     p_metrics metric_type[]
 )
     LANGUAGE plpgsql
-    AS $$
+AS $$
 DECLARE
-    current_ts timestamp := now();
-    metrics_length INT;
-    p_hardware_make TEXT;
-    p_hardware_model TEXT;
-    p_fw TEXT;
-    p_os TEXT;
-    p_os_version TEXT;
+    msg_type message_type;
+    received_ts TIMESTAMPTZ := now();
 BEGIN
-    -- store whole payload plus topic to data table --
+    msg_type := CASE
+            WHEN p_message_type='DDATA' or p_message_type='NDATA' THEN 'DATA'::message_type
+            WHEN p_message_type='DBIRTH' or p_message_type='NBIRTH' THEN 'BIRTH'::message_type
+            WHEN p_message_type='DDEATH' or p_message_type='NDEATH' THEN 'DEATH'::message_type
+            WHEN p_message_type='DCMD' or p_message_type='NCMD' THEN 'CMD'::message_type
+            WHEN p_message_type='STATE' THEN 'STATE'::message_type
+    END;
+        -- store whole payload plus topic to data table --
     INSERT INTO data
-    (received_at, group_id, message_type, edge_node_id, device_id, timestamp, seq, uuid, body, metrics)
+        (message_type, received_at, group_id, edge_node_id, device_id, timestamp, seq, uuid, body, metrics)
     VALUES
-        (current_ts, p_group_id, p_message_type, p_edge_node_id, p_device_id, p_timestamp, p_seq, p_uuid, p_body, p_metrics);
+        (msg_type, received_ts, p_group_id, p_edge_node_id, p_device_id, p_timestamp, p_seq, p_uuid, p_body, p_metrics);
+    IF msg_type='BIRTH' THEN
 
-    -- store birth messages to birth_data table --
-    IF p_message_type = 'DBIRTH'::message_type OR p_message_type = 'NBIRTH'::message_type THEN
+        UPDATE last_birth_msg
+        SET timestamp=p_timestamp, metrics=p_metrics, received_at=received_ts
+        WHERE group_id=p_group_id
+          AND edge_node_id=p_edge_node_id
+          AND device_id=p_device_id;
 
-        metrics_length := array_length(p_metrics, 1); -- Get the length of the array
-        IF metrics_length != 0 THEN
-            FOR i IN 1..metrics_length LOOP
-                -- Compare the array value with property names
-                IF p_metrics[i].name = 'Properties/Hardware Make' THEN
-                    p_hardware_make := p_metrics[i].value_string;
-                ELSEIF p_metrics[i].name = 'Properties/Hardware Model' THEN
-                    p_hardware_model := p_metrics[i].value_string;
-                ELSEIF p_metrics[i].name = 'Properties/FW' THEN
-                    p_fw := p_metrics[i].value_string;
-                ELSEIF p_metrics[i].name = 'Properties/OS' THEN
-                    p_os := p_metrics[i].value_string;
-                ELSEIF p_metrics[i].name = 'Properties/OS Version' THEN
-                    p_os_version := p_metrics[i].value_string;
-                END IF;
-            END LOOP;
+        -- if no rows were updated, insert the new data
+        IF NOT FOUND THEN
+                    INSERT INTO last_birth_msg
+                    (group_id, edge_node_id, device_id, timestamp, metrics, received_at)
+                    VALUES
+                        (
+                            p_group_id,
+                            p_edge_node_id,
+                            p_device_id,
+                            p_timestamp,
+                            p_metrics,
+                            received_ts
+                        );
         END IF;
-        -- Insert if no entry exists yet --
-        INSERT INTO birth_data (
-                group_id, edge_node_id, device_id, timestamp, metrics,
-                                seq, prop_hardware_make, prop_hardware_model,
-                                prop_fw, prop_os, prop_os_version,
-                                received_at, death_received_at
-        )
-        VALUES (
-                p_group_id, p_edge_node_id, p_device_id, p_timestamp, p_metrics,
-                p_seq, p_hardware_make, p_hardware_model,
-                    p_fw, p_os, p_os_version, current_ts, null)
-        ON CONFLICT (group_id, edge_node_id, device_id) DO UPDATE
-            -- Update if it already exists --
-            SET timestamp=p_timestamp,
-                metrics=p_metrics,
-                seq=p_seq,
-                prop_hardware_make=p_hardware_make,
-                prop_hardware_model=p_hardware_model,
-                prop_fw=p_fw,
-                prop_os=p_os,
-                prop_os_version=p_os_version,
-                received_at=current_ts,
-                death_received_at=null;
 
-    -- For death messages, update death_received value in birth_data table --
-    ELSIF p_message_type = 'DDEATH'::message_type OR p_message_type = 'NDEATH'::message_type THEN
-        UPDATE birth_data
-        SET death_received_at=current_ts
-        WHERE EXISTS (
-            SELECT 1 FROM birth_data
-                     WHERE birth_data.group_id=p_group_id
-                     AND birth_data.edge_node_id=p_edge_node_id
-                     AND birth_data.device_id=p_device_id
-        );
     END IF;
-END;
+END
 $$;
 
-
-CREATE OR REPLACE FUNCTION fetch_float_metrics_by_name(p_group_id TEXT,
-                                                       p_message_type message_type,
-                                                       p_edge_node_id TEXT,
-                                                       p_device_id TEXT,
-                                                       p_metric_name TEXT,
-                                                       p_limit INT
-)
-    RETURNS TABLE (
-                      "time" TIMESTAMPTZ,
-                      "value" REAL) AS
-$$
-BEGIN
-RETURN QUERY
-SELECT
-    m.timestamp as "time",
-    m.value_float as "value"
-FROM data as d
-         CROSS JOIN LATERAL unnest(d.metrics) AS m
-WHERE d.group_id=p_group_id
-  AND d.message_type=p_message_type
-  AND d.edge_node_id=p_edge_node_id
-  AND d.device_id=p_device_id
-  AND m.name=p_metric_name
-  ORDER BY m.timestamp DESC LIMIT p_limit;
-END;
-$$
-LANGUAGE plpgsql;
-
-
-CREATE OR REPLACE FUNCTION fetch_double_metrics_by_name(p_group_id TEXT,
-                                                       p_message_type message_type,
-                                                       p_edge_node_id TEXT,
-                                                       p_device_id TEXT,
-                                                       p_metric_name TEXT,
-                                                       p_limit INT
-)
+CREATE OR REPLACE FUNCTION fetch_double_metrics(p_group_id TEXT, p_device_name TEXT,p_time_from TIMESTAMPTZ, p_time_to TIMESTAMPTZ, p_limit INT)
     RETURNS TABLE (
                       "time" TIMESTAMPTZ,
                       "value" DOUBLE PRECISION) AS
 $$
+DECLARE
+    edge_part TEXT := SPLIT_PART(p_device_name, '.', 1);
+    device_part TEXT := SPLIT_PART(p_device_name, '.', 2);
 BEGIN
 RETURN QUERY
 SELECT
@@ -221,11 +149,33 @@ SELECT
 FROM data as d
          CROSS JOIN LATERAL unnest(d.metrics) AS m
 WHERE d.group_id=p_group_id
-  AND d.message_type=p_message_type
-  AND d.edge_node_id=p_edge_node_id
-  AND d.device_id=p_device_id
-  AND m.name=p_metric_name
+  AND d.message_type='DATA'
+  AND d.edge_node_id=edge_part
+  AND d.device_id=device_part
+  AND m.timestamp > p_time_from
+  AND m.timestamp < p_time_to
 ORDER BY m.timestamp DESC LIMIT p_limit;
 END;
 $$
 LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION fetch_all_devices_and_nodes(p_group_id TEXT)
+    RETURNS TABLE (device TEXT) AS
+$$
+BEGIN
+RETURN QUERY
+SELECT
+    CASE
+        WHEN d.device_id IS NULL THEN d.edge_node_id
+        ELSE CONCAT(d.edge_node_id, '.', d.device_id)
+        END AS device
+FROM data as d
+WHERE d.group_id=p_group_id
+  AND d.message_type ='BIRTH'
+GROUP by d.edge_node_id, d.device_id
+ORDER BY d.edge_node_id, d.device_id ASC;
+
+END;
+$$
+LANGUAGE plpgsql;
+

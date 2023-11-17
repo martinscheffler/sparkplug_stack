@@ -8,20 +8,27 @@ services:
     ports:
       - "5432:5432"
     restart: unless-stopped
+    #volumes:
+    #  - ./timescaledb/pgdata:/var/lib/postgresql/data
+    #  - ./timescaledb/logs:/var/log/postgresql
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: changeme
       POSTGRES_DB: gosp3
+    networks:
+      - sparkplug_stack
 
   nats:
     container_name: nats
-    image: nats:2.10.1-alpine3.18
+    image: nats:2.10.5-alpine3.18
     ports:
       - "1883:1883" # MQTT port
       - "4222:4222" # NATS port
     command: -c /nats.conf
     volumes:
       - ./nats/nats.conf:/nats.conf:ro
+    networks:
+      - sparkplug_stack
 
   spb_to_timescaledb:
     container_name: spb_to_timescaledb
@@ -31,6 +38,8 @@ services:
     environment:
       NATS_BROKER: "nats://nats:4222"
       POSTGRES_URL: "postgres://postgres:changeme@timescaledb:5432/gosp3"
+    networks:
+      - sparkplug_stack
 
   grafana:
     container_name: grafana
@@ -47,3 +56,24 @@ services:
       #GF_INSTALL_PLUGINS: briangann-gauge-panel
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
+    networks:
+      - sparkplug_stack
+
+  nodered:
+    build:
+      context: ./nodered
+    ports:
+      - "1880:1880"
+    volumes:
+     - ./nodered/data:/data
+    environment:
+      - NODE_RED_ENABLE_PROJECTS=true
+      - NODE_RED_USERNAME=admin
+      - NODE_RED_PASSWORD=password
+    command: npm start -- --userDir /data
+    networks:
+      - sparkplug_stack
+
+networks:
+  sparkplug_stack:
+    driver: bridge
