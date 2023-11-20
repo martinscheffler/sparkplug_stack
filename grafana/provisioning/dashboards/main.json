@@ -120,6 +120,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "10.2.1",
       "targets": [
         {
           "datasource": {
@@ -127,11 +128,11 @@
             "uid": "P40AE60E18F02DE32"
           },
           "editorMode": "code",
-          "format": "table",
+          "format": "time_series",
           "hide": false,
           "rawQuery": true,
-          "rawSql": "SELECT * from fetch_double_metrics('spie', '${device:raw}', $__timeFrom(), $__timeTo(), 100000);",
-          "refId": "A",
+          "rawSql": "SELECT * from fetch_metrics('${GROUP_ID}', '${device:raw}', $__timeFrom(), $__timeTo(), 100000);",
+          "refId": "Metrics",
           "sql": {
             "columns": [
               {
@@ -158,6 +159,12 @@
         }
       ],
       "title": "Sparkplug 3 Device '${device}'",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {}
+        }
+      ],
       "type": "timeseries"
     }
   ],
@@ -168,22 +175,34 @@
   "templating": {
     "list": [
       {
-        "hide": 2,
+        "current": {
+          "selected": true,
+          "text": "Sparkplug_Devices",
+          "value": "Sparkplug_Devices"
+        },
+        "hide": 0,
         "name": "GROUP_ID",
-        "query": "spie",
+        "options": [
+          {
+            "selected": true,
+            "text": "Sparkplug_Devices",
+            "value": "Sparkplug_Devices"
+          }
+        ],
+        "query": "Sparkplug_Devices",
         "skipUrlSync": false,
-        "type": "constant"
+        "type": "textbox"
       },
       {
         "current": {
           "selected": true,
           "text": [
-            "edge0001.sin2",
-            "edge0001.sin3"
+            "TestNode.DynamicMetricDefinitionDevice",
+            "TestNode.SinusDevice"
           ],
           "value": [
-            "edge0001.sin2",
-            "edge0001.sin3"
+            "TestNode.DynamicMetricDefinitionDevice",
+            "TestNode.SinusDevice"
           ]
         },
         "datasource": {
@@ -206,7 +225,7 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},

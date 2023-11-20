@@ -3,7 +3,7 @@ CALL insert_sparkplug_payload(
         '{{.MessageType}}',
         '{{.EdgeNodeId}}',
         {{with .DeviceId}}'{{.}}'{{else}}null{{end}},
-        {{with .Payload.Timestamp}}to_timestamp({{.}} / 1000) AT TIME ZONE 'UTC'{{else}}null{{end}},
+        {{with .Payload.Timestamp}}to_timestamp({{.}} / 1000.0) AT TIME ZONE 'UTC'{{else}}null{{end}},
         {{with .Payload.Seq}}{{.}}{{else}}null{{end}},
         {{with .Payload.Uuid}}'{{.}}'{{else}}null{{end}},
         null,
@@ -12,13 +12,47 @@ CALL insert_sparkplug_payload(
                 ROW(
                     {{with $e.Name}}'{{.}}'{{else}}null{{end}},
                     {{with $e.Alias}}{{.}}{{else}}null{{end}},
-                    {{with $e.Timestamp}}to_timestamp({{.}} / 1000) AT TIME ZONE 'UTC'{{else}}null{{end}},
+                    {{with $e.Timestamp}}to_timestamp({{.}} / 1000.0) AT TIME ZONE 'UTC'{{else}}null{{end}},
                     {{with $e.Datatype}}{{.}}{{else}}null{{end}},
                     {{with $e.IsHistorical}}{{.}}{{else}}null{{end}},
                     {{with $e.IsTransient}}{{.}}{{else}}null{{end}},
                     {{with $e.IsNull}}{{.}}{{else}}null{{end}},
-                    {{with $e.Metadata}}{{.}}{{else}}null{{end}},
-                    {{with $e.Properties}}{{.}}{{else}}null{{end}},
+                    null,
+                    {{with $e.Properties}}
+                        ROW(
+                            ARRAY[
+                               {{ range $j, $f := .Keys }}{{if $j}},{{end}}
+                                    '{{.}}'
+                               {{end}}
+                            ],
+                            ARRAY[
+                               {{ range $j, $f := .Values }}{{if $j}},{{end}}
+                                    ROW(
+                                    1,
+                                    false,
+                                    10,
+                                    100,
+                                    10.5,
+                                    12.5,
+                                    true,
+                                    'string value'
+                                    )::propertyvalue_type,
+                                    ROW(
+                                    2,
+                                    true,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null
+                                    )::propertyvalue_type
+                            {{end}}
+                            ]
+                        )::propertyset_type
+
+                    {{else}}null{{end}},
+
                     {{with $e.GetStringValue}}'{{.}}'{{else}}null{{end}},
                     {{with $e.GetBooleanValue}}{{.}}{{else}}null{{end}},
                     {{with $e.GetIntValue}}{{.}}{{else}}null{{end}},

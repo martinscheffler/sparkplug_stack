@@ -1,6 +1,6 @@
 
 CREATE EXTENSION IF NOT EXISTS timescaledb;
-
+CREATE EXTENSION IF NOT EXISTS tablefunc;
 
 CREATE TYPE message_type AS ENUM (
     'BIRTH',
@@ -12,7 +12,7 @@ CREATE TYPE message_type AS ENUM (
 
 
 CREATE TYPE metadata_type AS (
-    is_multi_part bool,
+    is_multi_part BOOLEAN,
     content_type TEXT,
     size BIGINT,
     seq BIGINT,
@@ -22,10 +22,24 @@ CREATE TYPE metadata_type AS (
     description TEXT
     );
 
+CREATE TYPE propertyvalue_type AS (
+    "type" INT,
+    is_null BOOLEAN,
+    int_value INT,
+    long_value BIGINT,
+    float_value FLOAT,
+    double_value DOUBLE PRECISION,
+    boolean_value BOOLEAN,
+    string_value TEXT
+    --- TODO figure out how to handle circular reference
+    --- propertyset_value propertyset_type,
+    --- propertyset_list propertyset_type[]
+
+    );
 
 CREATE TYPE propertyset_type AS (
     keys TEXT[],
-    values jsonb[]
+    values propertyvalue_type[]
     );
 
 
@@ -34,9 +48,9 @@ CREATE TYPE metric_type AS (
     "alias" BIGINT,
     "timestamp" TIMESTAMPTZ,
     "datatype" INTEGER,
-    is_historical bool,
-    is_transient bool,
-    is_null bool,
+    is_historical BOOLEAN,
+    is_transient BOOLEAN,
+    is_null BOOLEAN,
     metadata metadata_type,
     properties propertyset_type,
     value_string TEXT,
@@ -65,16 +79,39 @@ create table public.data
 SELECT create_hypertable('data', 'received_at');
 
 
-create table public.last_birth_msg
+create table public.birth_msg
 (
     group_id TEXT NOT NULL,
     edge_node_id TEXT NOT NULL,
     device_id TEXT NULL,
     timestamp TIMESTAMPTZ NULL,
     metrics metric_type[],
-    received_at TIMESTAMPTZ NOT NULL
+    received_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT unique_birth_per_node UNIQUE (group_id, edge_node_id, device_id)
+
 );
 
+
+create table public.metrics_info
+(
+    group_id TEXT NOT NULL,
+    edge_node_id TEXT NOT NULL,
+    device_id TEXT NULL,
+    "name" TEXT,
+    alias INT,
+    properties jsonb,
+    CONSTRAINT unique_alias_per_node UNIQUE (group_id, edge_node_id, device_id, name)
+);
+
+
+create table public.death_msg
+(
+    group_id TEXT NOT NULL,
+    edge_node_id TEXT NOT NULL,
+    device_id TEXT NULL,
+    received_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT unique_death_per_node UNIQUE (group_id, edge_node_id, device_id)
+);
 
 
 CREATE OR REPLACE PROCEDURE insert_sparkplug_payload(
@@ -93,6 +130,7 @@ AS $$
 DECLARE
     msg_type message_type;
     received_ts TIMESTAMPTZ := now();
+    metric metric_type;
 BEGIN
     msg_type := CASE
             WHEN p_message_type='DDATA' or p_message_type='NDATA' THEN 'DATA'::message_type
@@ -106,18 +144,19 @@ BEGIN
         (message_type, received_at, group_id, edge_node_id, device_id, timestamp, seq, uuid, body, metrics)
     VALUES
         (msg_type, received_ts, p_group_id, p_edge_node_id, p_device_id, p_timestamp, p_seq, p_uuid, p_body, p_metrics);
+
     IF msg_type='BIRTH' THEN
 
-        UPDATE last_birth_msg
-        SET timestamp=p_timestamp, metrics=p_metrics, received_at=received_ts
+        UPDATE birth_msg
+        SET timestamp=p_timestamp, received_at=received_ts, metrics=p_metrics
         WHERE group_id=p_group_id
-          AND edge_node_id=p_edge_node_id
-          AND device_id=p_device_id;
+        AND edge_node_id=p_edge_node_id
+        AND device_id=p_device_id;
 
         -- if no rows were updated, insert the new data
         IF NOT FOUND THEN
-                    INSERT INTO last_birth_msg
-                    (group_id, edge_node_id, device_id, timestamp, metrics, received_at)
+                    INSERT INTO birth_msg
+                    (group_id, edge_node_id, device_id, "timestamp", metrics, received_at)
                     VALUES
                         (
                             p_group_id,
@@ -129,35 +168,55 @@ BEGIN
                         );
         END IF;
 
+        FOREACH metric IN ARRAY p_metrics LOOP
+             -- RAISE WARNING 'Metric: % Alias: %', metric.name, metric.alias;--
+            IF metric.alias IS NOT NULL THEN
+                INSERT INTO metrics_info
+                    (group_id, edge_node_id, device_id, "name", alias)
+                VALUES
+                    (p_group_id, p_edge_node_id, p_device_id, metric.name, metric.alias)
+                ON CONFLICT(group_id, edge_node_id, device_id, "name")
+                    DO UPDATE SET alias=metric.alias;
+            END IF;
+        END LOOP;
+
     END IF;
 END
 $$;
 
-CREATE OR REPLACE FUNCTION fetch_double_metrics(p_group_id TEXT, p_device_name TEXT,p_time_from TIMESTAMPTZ, p_time_to TIMESTAMPTZ, p_limit INT)
-    RETURNS TABLE (
-                      "time" TIMESTAMPTZ,
-                      "value" DOUBLE PRECISION) AS
+
+CREATE OR REPLACE FUNCTION fetch_metrics(p_group_id TEXT, p_device_name TEXT, p_time_from TIMESTAMPTZ, p_time_to TIMESTAMPTZ, p_limit INT)
+    RETURNS TABLE ("time" TIMESTAMPTZ, "metric" TEXT, "value" DOUBLE PRECISION) AS
 $$
 DECLARE
-    edge_part TEXT := SPLIT_PART(p_device_name, '.', 1);
+edge_part TEXT := SPLIT_PART(p_device_name, '.', 1);
     device_part TEXT := SPLIT_PART(p_device_name, '.', 2);
 BEGIN
 RETURN QUERY
+
 SELECT
-    m.timestamp as "time",
-    m.value_double as "value"
+    d.received_at as time,
+            COALESCE(m.name, a.name) as name,
+            COALESCE(
+                    m.value_double,
+                    CAST(m.value_int AS DOUBLE PRECISION),
+                    CAST(m.value_uint64 AS DOUBLE PRECISION),
+                    CAST(m.value_float AS DOUBLE PRECISION)
+        ) AS value
 FROM data as d
-         CROSS JOIN LATERAL unnest(d.metrics) AS m
-WHERE d.group_id=p_group_id
+    CROSS JOIN LATERAL unnest(d.metrics) AS m
+    LEFT JOIN metrics_info a ON m.alias = a.alias
+WHERE d.group_id= p_group_id
   AND d.message_type='DATA'
   AND d.edge_node_id=edge_part
   AND d.device_id=device_part
-  AND m.timestamp > p_time_from
-  AND m.timestamp < p_time_to
-ORDER BY m.timestamp DESC LIMIT p_limit;
+  AND d.received_at > p_time_from
+  AND d.received_at < p_time_to
+ORDER BY d.received_at ASC LIMIT p_limit;
 END;
 $$
 LANGUAGE plpgsql;
+
 
 CREATE OR REPLACE FUNCTION fetch_all_devices_and_nodes(p_group_id TEXT)
     RETURNS TABLE (device TEXT) AS
@@ -166,16 +225,69 @@ BEGIN
 RETURN QUERY
 SELECT
     CASE
-        WHEN d.device_id IS NULL THEN d.edge_node_id
-        ELSE CONCAT(d.edge_node_id, '.', d.device_id)
+        WHEN device_id IS NULL THEN edge_node_id
+        ELSE CONCAT(edge_node_id, '.', device_id)
         END AS device
-FROM data as d
-WHERE d.group_id=p_group_id
-  AND d.message_type ='BIRTH'
-GROUP by d.edge_node_id, d.device_id
-ORDER BY d.edge_node_id, d.device_id ASC;
+FROM birth_msg
+WHERE group_id=p_group_id
+ORDER BY device_id, edge_node_id ASC
+;
 
 END;
 $$
 LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION propertyset_to_json(properties propertyset_type)
+    RETURNS TABLE(json jsonb)
+AS $$
+DECLARE
+    key_index INTEGER;
+BEGIN
+    -- initialize an empty JSON object
+    json := '{}'::jsonb;
+
+    -- iterate over the keys and values in the propertyset_type, and add each key-value pair to the JSON object
+    FOR key_index IN 1..array_length(properties.keys, 1) LOOP
+            json := json || jsonb_build_object(
+                    properties.keys[key_index],
+                    COALESCE(to_jsonb(properties.values[key_index].string_value),
+                             to_jsonb(properties.values[key_index].int_value),
+                             to_jsonb(properties.values[key_index].long_value),
+                             to_jsonb(properties.values[key_index].float_value),
+                             to_jsonb(properties.values[key_index].double_value),
+                             to_jsonb(properties.values[key_index].boolean_value)
+                    )
+            );
+        END LOOP;
+
+    -- return the JSON object in a table with a single row and column
+    RETURN QUERY SELECT json;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION fetch_grafana_config(p_group_id TEXT, p_device_name TEXT)
+    RETURNS TABLE ("name" TEXT, "color" TEXT, "unit" TEXT) AS
+$$
+DECLARE
+    edge_part TEXT := SPLIT_PART(p_device_name, '.', 1);
+    device_part TEXT := SPLIT_PART(p_device_name, '.', 2);
+BEGIN
+    RETURN QUERY
+        SELECT
+            m.name,
+            props_json->>'Grafana/Unit' as unit,
+            props_json->>'Grafana/Color' as color
+        FROM birth_msg as b
+                CROSS JOIN LATERAL unnest(b.metrics) AS m
+                CROSS JOIN LATERAL propertyset_to_json(m.properties) as props_json
+        WHERE b.group_id=p_group_id
+          AND b.edge_node_id=edge_part
+          AND b.device_id=device_part
+        ORDER BY m.name ASC;
+END;
+$$
+    LANGUAGE plpgsql;
+
 
