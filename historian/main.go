@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/proto"
-	"gosp3/sparkplug_b"
+	"historian/sparkplug_b"
 	"log"
 	"os"
 	"os/signal"
@@ -42,7 +42,7 @@ func getEnvOrDefault(key, fallback string) string {
 
 func init() {
 	flag.StringVar(&NatsBroker, "NatsBroker", getEnvOrDefault("NATS_BROKER", "nats://127.0.0.1:4222"), "NATS Broker URL")
-	flag.StringVar(&PostgresURL, "PostgresURL", getEnvOrDefault("POSTGRES_URL", "postgres://postgres:changeme@127.0.0.1:5432/gosp3"), "PostgreSQL URL")
+	flag.StringVar(&PostgresURL, "PostgresURL", getEnvOrDefault("POSTGRES_URL", "postgres://postgres:changeme@127.0.0.1:5432/historian"), "PostgreSQL URL")
 	flag.Parse()
 }
 
@@ -138,7 +138,10 @@ func connectDB() {
 }
 
 func disconnectDB() {
-	PgCon.Close(PgCtx)
+	err := PgCon.Close(PgCtx)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func connectNats() {
@@ -161,7 +164,10 @@ func connectNats() {
 }
 
 func disconnectNats() {
-	NatsSub.Unsubscribe()
+	err := NatsSub.Unsubscribe()
+	if err != nil {
+		log.Fatal(err)
+	}
 	NatsCon.Close()
 }
 

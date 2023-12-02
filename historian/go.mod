@@ -1,4 +1,4 @@
-module gosp3
+module historian
 
 go 1.21
 

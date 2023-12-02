@@ -79,7 +79,7 @@ create table public.data
 SELECT create_hypertable('data', 'received_at');
 
 
-create table public.birth_msg
+create table public.birth
 (
     group_id TEXT NOT NULL,
     edge_node_id TEXT NOT NULL,
@@ -104,11 +104,12 @@ create table public.metrics_info
 );
 
 
-create table public.death_msg
+create table public.death
 (
     group_id TEXT NOT NULL,
     edge_node_id TEXT NOT NULL,
     device_id TEXT NULL,
+    timestamp TIMESTAMPTZ NULL,
     received_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT unique_death_per_node UNIQUE (group_id, edge_node_id, device_id)
 );
@@ -147,7 +148,7 @@ BEGIN
 
     IF msg_type='BIRTH' THEN
 
-        UPDATE birth_msg
+        UPDATE birth
         SET timestamp=p_timestamp, received_at=received_ts, metrics=p_metrics
         WHERE group_id=p_group_id
         AND edge_node_id=p_edge_node_id
@@ -155,7 +156,7 @@ BEGIN
 
         -- if no rows were updated, insert the new data
         IF NOT FOUND THEN
-                    INSERT INTO birth_msg
+                    INSERT INTO birth
                     (group_id, edge_node_id, device_id, "timestamp", metrics, received_at)
                     VALUES
                         (
@@ -179,7 +180,26 @@ BEGIN
                     DO UPDATE SET alias=metric.alias;
             END IF;
         END LOOP;
+    ELSEIF msg_type='DEATH' THEN
+        UPDATE death
+        SET timestamp=p_timestamp, received_at=received_ts
+        WHERE group_id=p_group_id
+          AND edge_node_id=p_edge_node_id
+          AND device_id=p_device_id;
 
+        -- if no rows were updated, insert the new data
+        IF NOT FOUND THEN
+            INSERT INTO death
+            (group_id, edge_node_id, device_id, "timestamp",received_at)
+            VALUES
+                (
+                    p_group_id,
+                    p_edge_node_id,
+                    p_device_id,
+                    p_timestamp,
+                    received_ts
+                );
+        END IF;
     END IF;
 END
 $$;
@@ -222,20 +242,19 @@ CREATE OR REPLACE FUNCTION fetch_all_devices_and_nodes(p_group_id TEXT)
     RETURNS TABLE (device TEXT) AS
 $$
 BEGIN
-RETURN QUERY
-SELECT
-    CASE
-        WHEN device_id IS NULL THEN edge_node_id
-        ELSE CONCAT(edge_node_id, '.', device_id)
-    END AS device
-FROM birth_msg
-WHERE group_id=p_group_id
-ORDER BY device_id, edge_node_id ASC;
+    RETURN QUERY
+        SELECT
+            CASE
+                WHEN length(device_id) = 0 THEN edge_node_id
+                ELSE CONCAT(edge_node_id, '.', device_id)
+                END AS device
+        FROM birth
+        WHERE group_id=p_group_id
+        ORDER BY device_id, edge_node_id ASC;
 
 END;
 $$
-LANGUAGE plpgsql;
-
+    LANGUAGE plpgsql;
 
 
 CREATE OR REPLACE FUNCTION propertyset_to_json(properties propertyset_type)
@@ -282,7 +301,7 @@ BEGIN
             props_json->>'Grafana/Color' as color,
             props_json->>'Grafana/Unit' as unit,
             props_json
-        FROM birth_msg as b
+        FROM birth as b
                 CROSS JOIN LATERAL unnest(b.metrics) AS m
                 CROSS JOIN LATERAL propertyset_to_json(m.properties) as props_json
         WHERE b.group_id=p_group_id

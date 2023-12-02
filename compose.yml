@@ -14,7 +14,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: changeme
-      POSTGRES_DB: gosp3
+      POSTGRES_DB: historian
     networks:
       - sparkplug_stack
 
@@ -30,14 +30,14 @@ services:
     networks:
       - sparkplug_stack
 
-  spb_to_timescaledb:
-    container_name: spb_to_timescaledb
+  historian:
+    container_name: historian
     build:
-      context: spb_to_timescaledb/
+      context: historian/
     restart: unless-stopped
     environment:
       NATS_BROKER: "nats://nats:4222"
-      POSTGRES_URL: "postgres://postgres:changeme@timescaledb:5432/gosp3"
+      POSTGRES_URL: "postgres://postgres:changeme@timescaledb:5432/historian"
     networks:
       - sparkplug_stack
 
