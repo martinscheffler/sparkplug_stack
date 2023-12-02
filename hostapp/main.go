@@ -5,12 +5,12 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"github.com/jackc/pgx/v4"
 	"github.com/nats-io/nats.go"
 	"google.golang.org/protobuf/proto"
-	"historian/sparkplug_b"
+	"hostapp/sparkplug_b"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -42,7 +42,7 @@ func getEnvOrDefault(key, fallback string) string {
 
 func init() {
 	flag.StringVar(&NatsBroker, "NatsBroker", getEnvOrDefault("NATS_BROKER", "nats://127.0.0.1:4222"), "NATS Broker URL")
-	flag.StringVar(&PostgresURL, "PostgresURL", getEnvOrDefault("POSTGRES_URL", "postgres://postgres:changeme@127.0.0.1:5432/historian"), "PostgreSQL URL")
+	flag.StringVar(&PostgresURL, "PostgresURL", getEnvOrDefault("POSTGRES_URL", "postgres://postgres:changeme@127.0.0.1:5432/hostapp"), "PostgreSQL URL")
 	flag.Parse()
 }
 
@@ -87,29 +87,24 @@ func storeSparkplugMessageToDB(sparkplugMessage *SparkplugMessage) error {
 	var buffer bytes.Buffer
 	err := sqlTemplate.Execute(&buffer, sparkplugMessage)
 	if err != nil {
-		fmt.Println("Error:", err)
 		return err
 	}
 
 	sql := buffer.String()
 	_, err = PgCon.Exec(PgCtx, sql)
-	if err != nil {
-		fmt.Println("Error:", err)
-		fmt.Println("SQL:", sql)
-	}
 	return err
 }
 
 func onReceive(msg *nats.Msg) {
 	sparkplugMsg, err := NewSparkplugMessage(msg.Subject, msg.Data)
 	if err != nil {
-		fmt.Println("Error during unmarshalling:", err)
+		log.Printf("Error during unmarshalling: %v", err)
 		return
 	}
 	log.Printf("Received: %s", string(msg.Subject))
 	err = storeSparkplugMessageToDB(sparkplugMsg)
 	if err != nil {
-		fmt.Println("Error saving to DB:", err)
+		log.Printf("Error saving to DB: %v", err)
 		return
 	}
 }
@@ -124,7 +119,7 @@ func loadTemplateFromFile() {
 }
 
 func connectDB() {
-	fmt.Printf("Connecting to PostgreSQL on URL %v.\n", PostgresURL)
+	log.Printf("Connecting to PostgreSQL on URL %v.\n", PostgresURL)
 	pgConfig, err := pgx.ParseConfig(PostgresURL)
 	if err != nil {
 		log.Fatal("error parsing postgres config: ", err)
@@ -146,7 +141,7 @@ func disconnectDB() {
 
 func connectNats() {
 
-	fmt.Printf("Connecting to NATS on URL %v.\n", NatsBroker)
+	log.Printf("Connecting to NATS on URL %v.\n", NatsBroker)
 	// connect to NATS
 	nc, err := nats.Connect(NatsBroker)
 	if err != nil {
@@ -177,12 +172,39 @@ func waitForSignal() {
 	<-sigChan
 }
 
+func helloHandler(w http.ResponseWriter, r *http.Request) {
+	// Get the query parameter from the request
+	name := r.URL.Query().Get("name")
+
+	// Set the content type header
+	w.Header().Set("Content-Type", "text/plain")
+
+	// Write the response
+	if len(name) > 0 {
+		log.Printf("Hello, %s!", name)
+	} else {
+		log.Printf("Hello, World!")
+	}
+}
+
+func startWebUI() {
+	fs := http.FileServer(http.Dir("static"))
+	http.Handle("/", fs)
+
+	// Handle dynamic requests
+	http.HandleFunc("/hello", helloHandler)
+
+	// Start the server
+	log.Printf("Server listening on port 8080...")
+	http.ListenAndServe(":8080", nil)
+}
+
 func main() {
 
 	loadTemplateFromFile()
 	connectDB()
 	connectNats()
-
+	startWebUI()
 	waitForSignal()
 
 	disconnectNats()

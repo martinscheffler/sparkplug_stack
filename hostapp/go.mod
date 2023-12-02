@@ -1,4 +1,4 @@
-module historian
+module hostapp
 
 go 1.21
 

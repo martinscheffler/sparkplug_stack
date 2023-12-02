@@ -6,7 +6,7 @@ datasources:
   - name: TimescaleDB
     type: postgres
     url: timescaledb:5432
-    database: historian
+    database: hostapp
     user: postgres
     secureJsonData:
       password: 'changeme'
