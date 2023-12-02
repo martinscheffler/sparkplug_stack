@@ -45,9 +45,9 @@ func storeSparkplugMessageToDB(sparkplugMessage *SparkplugMessage) error {
 	_, err = pgCon.Exec(pgCtx, sql)
 	return err
 }
-func loadTemplateFromFile() error {
+func loadTemplateFromFile(filename string) error {
 	// load template from file
-	tpl, err := template.New(TemplateFileName).ParseFiles(TemplateFileName)
+	tpl, err := template.New(filename).ParseFiles(filename)
 	if err != nil {
 		return err
 	}

@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,7 +13,7 @@ var (
 	postgresURL string
 )
 
-var TemplateFileName string = "insert_spb.sql.gohtml"
+var templateFileName string = "insert_spb.sql.gohtml"
 
 func getEnvOrDefault(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
@@ -35,36 +34,9 @@ func waitForSignal() {
 	<-sigChan
 }
 
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-	// Get the query parameter from the request
-	name := r.URL.Query().Get("name")
-
-	// Set the content type header
-	w.Header().Set("Content-Type", "text/plain")
-
-	// Write the response
-	if len(name) > 0 {
-		log.Printf("Hello, %s!", name)
-	} else {
-		log.Printf("Hello, World!")
-	}
-}
-
-func startWebUI() error {
-	fs := http.FileServer(http.Dir("static"))
-	http.Handle("/", fs)
-
-	// Handle dynamic requests
-	http.HandleFunc("/hello", helloHandler)
-
-	// Start the server
-	log.Printf("Server listening on port 8080...")
-	return http.ListenAndServe(":8080", nil)
-}
-
 func main() {
 
-	err := loadTemplateFromFile()
+	err := loadTemplateFromFile(templateFileName)
 	if err != nil {
 		log.Fatal(err)
 	}
