@@ -227,7 +227,8 @@ FROM data as d
     CROSS JOIN LATERAL unnest(d.metrics) AS m
     LEFT JOIN metrics_info a ON m.alias = a.alias
 WHERE d.group_id= p_group_id
-  AND d.message_type='DATA'
+  AND d.message_type in ('BIRTH', 'DATA')
+  AND m.datatype NOT in(12, 13, 14) -- ignore text and date metrics --
   AND d.edge_node_id=edge_part
   AND d.device_id=device_part
   AND d.received_at > p_time_from
