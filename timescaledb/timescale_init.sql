@@ -83,7 +83,7 @@ create table public.birth_msg
 (
     group_id TEXT NOT NULL,
     edge_node_id TEXT NOT NULL,
-    device_id TEXT NULL,
+    device_id TEXT NOT NULL,
     timestamp TIMESTAMPTZ NULL,
     metrics metric_type[],
     received_at TIMESTAMPTZ NOT NULL,
@@ -227,15 +227,15 @@ SELECT
     CASE
         WHEN device_id IS NULL THEN edge_node_id
         ELSE CONCAT(edge_node_id, '.', device_id)
-        END AS device
+    END AS device
 FROM birth_msg
 WHERE group_id=p_group_id
-ORDER BY device_id, edge_node_id ASC
-;
+ORDER BY device_id, edge_node_id ASC;
 
 END;
 $$
 LANGUAGE plpgsql;
+
 
 
 CREATE OR REPLACE FUNCTION propertyset_to_json(properties propertyset_type)
@@ -246,20 +246,22 @@ DECLARE
 BEGIN
     -- initialize an empty JSON object
     json := '{}'::jsonb;
+    IF properties IS NOT NULL THEN
 
-    -- iterate over the keys and values in the propertyset_type, and add each key-value pair to the JSON object
-    FOR key_index IN 1..array_length(properties.keys, 1) LOOP
-            json := json || jsonb_build_object(
-                    properties.keys[key_index],
-                    COALESCE(to_jsonb(properties.values[key_index].string_value),
-                             to_jsonb(properties.values[key_index].int_value),
-                             to_jsonb(properties.values[key_index].long_value),
-                             to_jsonb(properties.values[key_index].float_value),
-                             to_jsonb(properties.values[key_index].double_value),
-                             to_jsonb(properties.values[key_index].boolean_value)
-                    )
-            );
-        END LOOP;
+        -- iterate over the keys and values in the propertyset_type, and add each key-value pair to the JSON object
+        FOR key_index IN 1..array_length(properties.keys, 1) LOOP
+                json := json || jsonb_build_object(
+                        properties.keys[key_index],
+                        COALESCE(to_jsonb(properties.values[key_index].string_value),
+                                 to_jsonb(properties.values[key_index].int_value),
+                                 to_jsonb(properties.values[key_index].long_value),
+                                 to_jsonb(properties.values[key_index].float_value),
+                                 to_jsonb(properties.values[key_index].double_value),
+                                 to_jsonb(properties.values[key_index].boolean_value)
+                        )
+                                );
+            END LOOP;
+    END IF;
 
     -- return the JSON object in a table with a single row and column
     RETURN QUERY SELECT json;
@@ -268,7 +270,7 @@ $$ LANGUAGE plpgsql;
 
 
 CREATE OR REPLACE FUNCTION fetch_grafana_config(p_group_id TEXT, p_device_name TEXT)
-    RETURNS TABLE ("name" TEXT, "color" TEXT, "unit" TEXT) AS
+    RETURNS TABLE ("name" TEXT, "color" TEXT, "unit" TEXT, js jsonb) AS
 $$
 DECLARE
     edge_part TEXT := SPLIT_PART(p_device_name, '.', 1);
@@ -277,14 +279,16 @@ BEGIN
     RETURN QUERY
         SELECT
             m.name,
+            props_json->>'Grafana/Color' as color,
             props_json->>'Grafana/Unit' as unit,
-            props_json->>'Grafana/Color' as color
+            props_json
         FROM birth_msg as b
                 CROSS JOIN LATERAL unnest(b.metrics) AS m
                 CROSS JOIN LATERAL propertyset_to_json(m.properties) as props_json
         WHERE b.group_id=p_group_id
           AND b.edge_node_id=edge_part
           AND b.device_id=device_part
+          AND props_json <> '{}'::jsonb
         ORDER BY m.name ASC;
 END;
 $$

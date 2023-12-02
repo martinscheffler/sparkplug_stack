@@ -61,7 +61,7 @@ func NewSparkplugMessage(subject string, data []byte) (*SparkplugMessage, error)
 		return nil, errors.New("expected at least 4 parts in message subject")
 	}
 
-	var deviceId string
+	deviceId := ""
 	if len(parts) > 4 {
 		deviceId = parts[4]
 	}
@@ -81,42 +81,6 @@ func NewSparkplugMessage(subject string, data []byte) (*SparkplugMessage, error)
 		Payload:     &payload,
 	}, nil
 }
-
-/*func metricValueToJson(metric *sparkplug_b.Payload_Metric) string {
-	switch metric.GetValue().(type) {
-	case *sparkplug_b.Payload_Metric_IntValue:
-		return strconv.FormatUint(uint64(metric.GetIntValue()), 10)
-	case *sparkplug_b.Payload_Metric_LongValue:
-		return strconv.FormatUint(uint64(metric.GetLongValue()), 10)
-	case *sparkplug_b.Payload_Metric_FloatValue:
-		return strconv.FormatFloat(float64(metric.GetFloatValue()), 'f', -1, 32)
-	case *sparkplug_b.Payload_Metric_DoubleValue:
-		return strconv.FormatFloat(metric.GetDoubleValue(), 'f', -1, 64)
-	case *sparkplug_b.Payload_Metric_BooleanValue:
-		if metric.GetBooleanValue() {
-			return "true"
-		} else {
-			return "false"
-		}
-	case *sparkplug_b.Payload_Metric_StringValue:
-		return metric.GetStringValue()
-	case *sparkplug_b.Payload_Metric_BytesValue:
-		return base64.StdEncoding.EncodeToString(metric.GetBytesValue())
-	case *sparkplug_b.Payload_Metric_DatasetValue:
-		fmt.Println("Error: Metric value of type dataset not supported yet ")
-		return ""
-	case *sparkplug_b.Payload_Metric_TemplateValue:
-		fmt.Println("Error: Metric value of type template not supported yet ")
-		return ""
-	case *sparkplug_b.Payload_Metric_ExtensionValue:
-		fmt.Println("Error: Metric value of type extension not supported yet ")
-		return ""
-	default:
-		fmt.Println("Error: Unhandled metric value type")
-		return ""
-	}
-}
-*/
 
 func storeSparkplugMessageToDB(sparkplugMessage *SparkplugMessage) error {
 

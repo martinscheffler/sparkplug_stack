@@ -2,7 +2,7 @@ CALL insert_sparkplug_payload(
         '{{.GroupId}}',
         '{{.MessageType}}',
         '{{.EdgeNodeId}}',
-        {{with .DeviceId}}'{{.}}'{{else}}null{{end}},
+        '{{.DeviceId}}',
         {{with .Payload.Timestamp}}to_timestamp({{.}} / 1000.0) AT TIME ZONE 'UTC'{{else}}null{{end}},
         {{with .Payload.Seq}}{{.}}{{else}}null{{end}},
         {{with .Payload.Uuid}}'{{.}}'{{else}}null{{end}},
@@ -21,36 +21,23 @@ CALL insert_sparkplug_payload(
                     {{with $e.Properties}}
                         ROW(
                             ARRAY[
-                               {{ range $j, $f := .Keys }}{{if $j}},{{end}}
-                                    '{{.}}'
-                               {{end}}
+                               {{ range $j, $f := .Keys }}{{if $j}},{{end}}'{{.}}'{{end}}
                             ],
                             ARRAY[
                                {{ range $j, $f := .Values }}{{if $j}},{{end}}
                                     ROW(
-                                    1,
-                                    false,
-                                    10,
-                                    100,
-                                    10.5,
-                                    12.5,
-                                    true,
-                                    'string value'
-                                    )::propertyvalue_type,
-                                    ROW(
-                                    2,
-                                    true,
-                                    null,
-                                    null,
-                                    null,
-                                    null,
-                                    null,
-                                    null
+                                        {{with $f.Type}}{{.}}{{else}}null{{end}},
+                                        {{with $f.IsNull}}{{.}}{{else}}null{{end}},
+                                        {{with $f.GetIntValue}}{{.}}{{else}}null{{end}},
+                                        {{with $f.GetLongValue}}{{.}}{{else}}null{{end}},
+                                        {{with $f.GetFloatValue}}{{.}}{{else}}null{{end}},
+                                        {{with $f.GetDoubleValue}}{{.}}{{else}}null{{end}},
+                                        {{with $f.GetBooleanValue}}{{.}}{{else}}null{{end}},
+                                        {{with $f.GetStringValue}}'{{.}}'{{else}}null{{end}}
                                     )::propertyvalue_type
-                            {{end}}
+                               {{end}}
                             ]
                         )::propertyset_type
-
                     {{else}}null{{end}},
 
                     {{with $e.GetStringValue}}'{{.}}'{{else}}null{{end}},
