@@ -1,33 +1,47 @@
 package main
 
 import (
-	"log"
+	"github.com/labstack/echo/v4"
+	"html/template"
+	"io"
 	"net/http"
+	"time"
 )
 
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-	// Get the query parameter from the request
-	name := r.URL.Query().Get("name")
-
-	// Set the content type header
-	w.Header().Set("Content-Type", "text/plain")
-
-	// Write the response
-	if len(name) > 0 {
-		log.Printf("Hello, %s!", name)
-	} else {
-		log.Printf("Hello, World!")
-	}
+func isOlder(date1, date2 time.Time) bool {
+	return date1.Before(date2)
 }
 
-func startWebUI() error {
-	fs := http.FileServer(http.Dir("static"))
-	http.Handle("/", fs)
+type Template struct {
+	templates *template.Template
+}
 
-	// Handle dynamic requests
-	http.HandleFunc("/hello", helloHandler)
+func (t *Template) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+	return t.templates.ExecuteTemplate(w, name, data)
+}
 
-	// Start the server
-	log.Printf("Server listening on port 8080...")
-	return http.ListenAndServe(":8080", nil)
+func serveHTTP(c echo.Context) error {
+	devices, err := getDevicesAndNodes()
+	if err != nil {
+		return c.String(http.StatusInternalServerError, "Cannot fetch devices")
+	}
+	return c.Render(http.StatusOK, "index.html", devices)
+}
+
+func startWebUI() {
+
+	e := echo.New()
+	e.Static("/static", "static")
+	funcMap := template.FuncMap{
+		"isOlder": isOlder,
+	}
+
+	t := &Template{
+		templates: template.Must(template.New("base").Funcs(funcMap).ParseGlob("templates/*.html")),
+	}
+
+	e.Renderer = t
+	e.GET("/", serveHTTP)
+	e.Logger.Fatal(e.Start(":8080"))
+
 }

@@ -5,7 +5,16 @@ import (
 	"google.golang.org/protobuf/proto"
 	"hostapp/sparkplug_b"
 	"strings"
+	"time"
 )
+
+type Device struct {
+	GroupId    string
+	EdgeNodeID string
+	DeviceID   string
+	LastBirth  time.Time
+	LastDeath  *time.Time // nullable
+}
 
 type SparkplugMessage struct {
 	Namespace   string

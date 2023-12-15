@@ -239,6 +239,9 @@ $$
 LANGUAGE plpgsql;
 
 
+-- Returns a single column with a list of all devices and nodes.
+-- For nodes, the node_id is included.
+-- Devices are included in format [node id].[device id].
 CREATE OR REPLACE FUNCTION fetch_all_devices_and_nodes(p_group_id TEXT)
     RETURNS TABLE (device TEXT) AS
 $$
@@ -253,6 +256,37 @@ BEGIN
         WHERE group_id=p_group_id
         ORDER BY device_id, edge_node_id ASC;
 
+END;
+$$
+    LANGUAGE plpgsql;
+
+-- Returns a single column with a list of all devices and nodes.
+-- For nodes, the node_id is included.
+-- Devices are included in format [node id].[device id].
+CREATE OR REPLACE FUNCTION fetch_device_and_node_info()
+    RETURNS TABLE (
+        group_id TEXT,
+        edge_node_id TEXT,
+        device_id TEXT,
+        birth_time TIMESTAMPTZ,
+        death_time TIMESTAMPTZ
+    ) AS
+$$
+BEGIN
+    RETURN QUERY
+        SELECT
+            b.group_id,
+            b.edge_node_id,
+            b.device_id,
+            b.timestamp as birth_time,
+            d.received_at as death_time
+        FROM birth AS b
+        LEFT JOIN public.death AS d
+           ON
+           d.edge_node_id=b.edge_node_id AND
+           d.group_id=b.group_id AND
+           d.device_id=b.device_id
+        ORDER BY device_id, edge_node_id ASC;
 END;
 $$
     LANGUAGE plpgsql;

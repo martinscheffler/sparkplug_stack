@@ -36,7 +36,7 @@ func waitForSignal() {
 
 func main() {
 
-	err := loadTemplateFromFile(templateFileName)
+	err := loadSparkplugSqlTemplateFromFile(templateFileName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -51,12 +51,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = startWebUI()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	waitForSignal()
+	startWebUI()
 
 	err = disconnectNats()
 	if err != nil {

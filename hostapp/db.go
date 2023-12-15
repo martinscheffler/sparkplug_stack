@@ -45,7 +45,8 @@ func storeSparkplugMessageToDB(sparkplugMessage *SparkplugMessage) error {
 	_, err = pgCon.Exec(pgCtx, sql)
 	return err
 }
-func loadTemplateFromFile(filename string) error {
+
+func loadSparkplugSqlTemplateFromFile(filename string) error {
 	// load template from file
 	tpl, err := template.New(filename).ParseFiles(filename)
 	if err != nil {
@@ -53,4 +54,22 @@ func loadTemplateFromFile(filename string) error {
 	}
 	sqlTemplate = tpl
 	return nil
+}
+
+func getDevicesAndNodes() ([]Device, error) {
+	sql := "select * from fetch_device_and_node_info()"
+	rows, err := pgCon.Query(pgCtx, sql)
+	if err != nil {
+		return nil, err
+	}
+
+	var devices []Device
+	for rows.Next() {
+		var device Device
+		if err := rows.Scan(&device.GroupId, &device.EdgeNodeID, &device.DeviceID, &device.LastBirth, &device.LastDeath); err != nil {
+			return nil, err
+		}
+		devices = append(devices, device)
+	}
+	return devices, nil
 }
