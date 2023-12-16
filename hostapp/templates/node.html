@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Sparkplug_Stack host app</title>
+    <link href="static/pico.min.css" rel="stylesheet">
+</head>
+<body>
+
+<h1>Sparkplug Stack HostApp</h1>
+
+<h2>Device Details</h2>
+<pre>
+GroupId: {{.GroupId}}
+EdgeNodeId: {{.EdgeNodeId}}
+DeviceId: {{.DeviceId}}
+Online: {{if .LastDeath}}{{if isOlder .LastBirth .LastDeath}}no{{else}}yes{{end}}{{else}}yes{{end}}
+LastBirth: {{.LastBirth}}
+LastDeath: {{ with .LastDeath}}{{.}}{{end}}
+</pre>
+</body>
+</html>

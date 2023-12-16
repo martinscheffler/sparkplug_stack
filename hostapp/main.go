@@ -4,8 +4,6 @@ import (
 	"flag"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 )
 
 var (
@@ -13,7 +11,7 @@ var (
 	postgresURL string
 )
 
-var templateFileName string = "insert_spb.sql.gohtml"
+var templateFileName = "insert_spb.sql.gohtml"
 
 func getEnvOrDefault(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
@@ -26,12 +24,6 @@ func init() {
 	flag.StringVar(&natsBroker, "natsBroker", getEnvOrDefault("NATS_BROKER", "nats://127.0.0.1:4222"), "NATS Broker URL")
 	flag.StringVar(&postgresURL, "postgresURL", getEnvOrDefault("POSTGRES_URL", "postgres://postgres:changeme@127.0.0.1:5432/hostapp"), "PostgreSQL URL")
 	flag.Parse()
-}
-
-func waitForSignal() {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	<-sigChan
 }
 
 func main() {

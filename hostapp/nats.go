@@ -43,7 +43,7 @@ func onReceive(msg *nats.Msg) {
 		log.Printf("Error during unmarshalling: %v", err)
 		return
 	}
-	log.Printf("Received: %s Msg: %s", string(msg.Subject), sparkplugMsg)
+	log.Printf("Received: %s Msg: %s", msg.Subject, sparkplugMsg)
 	err = storeSparkplugMessageToDB(sparkplugMsg)
 	if err != nil {
 		log.Printf("Error saving to DB: %v", err)

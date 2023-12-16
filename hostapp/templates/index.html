@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Sparkplug_Stack hostapp</title>
+    <title>Sparkplug_Stack host app</title>
     <link href="static/pico.min.css" rel="stylesheet">
 </head>
 <body>
@@ -11,36 +11,23 @@
 <h2>Devices</h2>
 <table>
     <tr>
-        <th>GroupId</th>
-        <th>EdgeNodeID</th>
-        <th>DeviceID</th>
+        <th>Group</th>
+        <th>Node</th>
         <th>Connected</th>
-        <th>Last Birth</th>
-        <th>Last Death</th>
     </tr>
     {{range .}}
     <tr>
         <td>{{.GroupId}}</td>
-        <td>{{.EdgeNodeID}}</td>
-        <td>{{.DeviceID}}</td>
-        <td>{{if .LastDeath}}
-                {{if isOlder .LastBirth .LastDeath}}
-                    no
-                {{ else}}
-                    yes
-                {{end}}
-            {{else}}
-                Yes
-            {{end}}
+        <td>
+            <a href="/node/{{.GroupId}}/{{.EdgeNodeId}}{{if .DeviceId}}/{{.DeviceId}}{{end}}">
+                {{.EdgeNodeId}}{{if .DeviceId}}.{{.DeviceId}}{{end}}
+            </a>
         </td>
-        <td>{{.LastBirth}}</td>
-        <td>{{ with .LastDeath}}{{.}}{{end}}</td>
+        <td>{{.IsOnline}}</td>
 
     </tr>
     {{end}}
 </table>
-
-<div id="result"></div>
 
 </body>
 </html>
