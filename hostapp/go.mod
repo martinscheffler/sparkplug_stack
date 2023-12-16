@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/jackc/pgx/v4 v4.18.1
+	github.com/labstack/echo/v4 v4.11.3
 	github.com/nats-io/nats.go v1.31.0
 	google.golang.org/protobuf v1.31.0
 )
@@ -17,7 +18,6 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20231201235250-de7065d80cb9 // indirect
 	github.com/jackc/pgtype v1.14.0 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
-	github.com/labstack/echo/v4 v4.11.3 // indirect
 	github.com/labstack/gommon v0.4.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
