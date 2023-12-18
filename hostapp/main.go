@@ -22,7 +22,7 @@ func getEnvOrDefault(key, fallback string) string {
 
 func init() {
 	flag.StringVar(&natsBroker, "natsBroker", getEnvOrDefault("NATS_BROKER", "nats://127.0.0.1:4222"), "NATS Broker URL")
-	flag.StringVar(&postgresURL, "postgresURL", getEnvOrDefault("POSTGRES_URL", "postgres://postgres:changeme@127.0.0.1:5432/hostapp"), "PostgreSQL URL")
+	flag.StringVar(&postgresURL, "postgresURL", getEnvOrDefault("POSTGRES_URL", "postgres://postgres:changeme@127.0.0.1:5432/hostapp?sslmode=disable"), "PostgreSQL URL")
 	flag.Parse()
 }
 

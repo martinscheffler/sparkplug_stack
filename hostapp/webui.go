@@ -14,6 +14,7 @@ func isOlder(date1, date2 time.Time) bool {
 	return date1.Before(date2)
 }
 
+// Template is a custom template renderer for echo
 type Template struct {
 	templates *template.Template
 }
@@ -42,7 +43,14 @@ func serveNodeInfo(c echo.Context) error {
 	if err != nil {
 		return c.String(http.StatusInternalServerError, "Cannot fetch device")
 	}
-	return c.Render(http.StatusOK, "node.html", node)
+	data := struct {
+		Node      *NodeInfo
+		DataTypes map[int]string
+	}{
+		Node:      node,
+		DataTypes: DataTypes,
+	}
+	return c.Render(http.StatusOK, "node.html", data)
 }
 
 func customHTTPErrorHandler(err error, c echo.Context) {

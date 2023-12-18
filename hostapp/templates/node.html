@@ -2,20 +2,52 @@
 <html lang="en">
 <head>
     <title>Sparkplug_Stack host app</title>
-    <link href="static/pico.min.css" rel="stylesheet">
+    <link href="/static/pico.min.css" rel="stylesheet">
 </head>
+<style>
+    table th {
+        vertical-align: top;
+    }
+</style>
 <body>
 
 <h1>Sparkplug Stack HostApp</h1>
 
 <h2>Device Details</h2>
-<pre>
-GroupId: {{.GroupId}}
-EdgeNodeId: {{.EdgeNodeId}}
-DeviceId: {{.DeviceId}}
-Online: {{if .LastDeath}}{{if isOlder .LastBirth .LastDeath}}no{{else}}yes{{end}}{{else}}yes{{end}}
-LastBirth: {{.LastBirth}}
-LastDeath: {{ with .LastDeath}}{{.}}{{end}}
-</pre>
+<table>
+    <thead>
+        <tr><th scope="col">Property</th><th scope="col">Value</th></tr>
+    </thead>
+    <tr><th scope="row">GroupId</th><td>{{.Node.GroupId}}</td></tr>
+    <tr><th scope="row">EdgeNodeId</th><td>{{.Node.EdgeNodeId}}</td></tr>
+    <tr><th scope="row">DeviceId</th><td>{{.Node.DeviceId}}</td></tr>
+    <tr><th scope="row">LastBirth</th><td>{{.Node.LastBirth}}</td></tr>
+    <tr><th scope="row">LastDeath</th><td>{{ with .Node.LastDeath}}{{.}}{{end}}</td></tr>
+</table>
+<h2>Metrics</h2>
+<table>
+    <tr><th>Name</th><th>Alias</th><th>Timestamp</th><th>Datatype</th><th>Send</th></tr>
+    {{range .Node.Metrics}}
+        <tr>
+            <td>"{{.Name}}"</td>
+            <td>{{.Alias}}</td>
+            <td>{{.Timestamp}}</td>
+            <td>{{index $.DataTypes .DataType}}</td>
+            <td>
+                {{if eq .DataType 11 }}
+                <form>
+                    <div>
+                        <label for="valuebool">Value
+                            <input type="checkbox" id="valuebool" name="valuebool" value="{{.ValueBool}}" />
+                        </label>
+                        <button role="button" type="submit">OK</button>
+                    </div>
+                </form>
+                {{end}}
+            </td>
+        </tr>
+    {{end}}
+</table>
+
 </body>
 </html>
