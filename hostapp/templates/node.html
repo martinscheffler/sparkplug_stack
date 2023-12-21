@@ -1,20 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title>Sparkplug_Stack host app</title>
-    <link href="/static/pico.min.css" rel="stylesheet">
-</head>
-<style>
-    table th {
-        vertical-align: top;
-    }
-</style>
-<body>
+{{define "title"}}Node {{.Node.GroupId}}/{{.Node.EdgeNodeId}}/{{.Node.DeviceId}}{{end}}
 
-<h1>Sparkplug Stack HostApp</h1>
+{{define "main"}}
+    <div class="header">
+        <h1>Sparkplug_Stack node {{.Node.GroupId}}/{{.Node.EdgeNodeId}}/{{.Node.DeviceId}}</h1>
+        <h2>Devices</h2>
+    </div>
 
-<h2>Device Details</h2>
-<table>
+    <table>
     <thead>
         <tr><th scope="col">Property</th><th scope="col">Value</th></tr>
     </thead>
@@ -48,6 +40,4 @@
         </tr>
     {{end}}
 </table>
-
-</body>
-</html>
+{{end}}

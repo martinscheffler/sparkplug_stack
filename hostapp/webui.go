@@ -7,6 +7,8 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -14,13 +16,18 @@ func isOlder(date1, date2 time.Time) bool {
 	return date1.Before(date2)
 }
 
-// Template is a custom template renderer for echo
-type Template struct {
-	templates *template.Template
+// TemplateRegistry is a custom template renderer for echo
+type TemplateRegistry struct {
+	templates map[string]*template.Template
 }
 
-func (t *Template) Render(w io.Writer, name string, data interface{}, _ echo.Context) error {
-	return t.templates.ExecuteTemplate(w, name, data)
+func (t *TemplateRegistry) Render(w io.Writer, name string, data interface{}, _ echo.Context) error {
+	tmpl, ok := t.templates[name]
+	if !ok {
+		err := errors.New("TemplateRegistry not found -> " + name)
+		return err
+	}
+	return tmpl.ExecuteTemplate(w, "base.html", data)
 }
 
 func serveNodeList(c echo.Context) error {
@@ -79,10 +86,26 @@ func startWebUI() {
 	funcMap := template.FuncMap{
 		"isOlder": isOlder,
 	}
-	t := &Template{
-		templates: template.Must(template.New("base").Funcs(funcMap).ParseGlob("templates/*.html")),
+	templates := make(map[string]*template.Template)
+
+	pattern := "templates/*.html"
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
 	}
-	e.Renderer = t
+	base := "templates/base.html"
+	for _, file := range files {
+		fileName := filepath.Base(file)
+		if fileName != "base.html" {
+			templates[fileName] = template.Must(
+				template.New(fileName).Funcs(funcMap).ParseFiles(file, base))
+		}
+	}
+
+	e.Renderer = &TemplateRegistry{
+		templates: templates,
+	}
 
 	// Define routes
 	e.GET("/", serveNodeList)

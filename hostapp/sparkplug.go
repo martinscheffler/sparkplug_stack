@@ -36,7 +36,7 @@ var DataTypes = map[int]string{
 	16: "DataSet",
 	17: "Bytes",
 	18: "File",
-	19: "Template",
+	19: "TemplateRegistry",
 	20: "PropertySet",
 	21: "PropertySetList",
 	22: "Int8Array",
